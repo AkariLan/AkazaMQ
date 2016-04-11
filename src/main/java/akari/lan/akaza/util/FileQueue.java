@@ -1,22 +1,46 @@
 package akari.lan.akaza.util;
 
 import java.io.File;
+import java.io.RandomAccessFile;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Queue;
-
 import org.apache.log4j.Logger;
 
 public class FileQueue implements Queue<byte[]> {
 	
-	Logger logger = Logger.getLogger(FileQueue.class);
+	public static long SIGNATURE = 0x414B415A; //AKAZ 8BYTE
 	
-	public FileQueue(File queue) throws Exception {
+	public static long BUFFERLENGTH = 0x10000; //64kb
+	
+	private Logger logger = Logger.getLogger(FileQueue.class);
+	private MappedByteBuffer queueBuffer;
+	
+	
+	public FileQueue(String dataFilePath) throws Exception {
 		// TODO Auto-generated constructor stub
+		
+		File queue = new File(dataFilePath);
+		
+		boolean existAlready = false;
+		
 		if(!queue.exists()){
+			if(queue.createNewFile()){
+				logger.info("Create Queue File:"+dataFilePath);
+			}else{
+				logger.info("Could Not Create Queue File:"+dataFilePath);
+				throw new Exception("Could Not Create Queue File:"+dataFilePath);
+			}
+		}else{
+			existAlready = true;
+		}
+		
+		/*if(!queue.exists()){
 			logger.error("Queue File Doesn't Exits!");
 			throw new Exception("Queue File Doesn't Exits!");
-		}
+		}*/
 		if(queue.isDirectory()){
 			logger.error("Queue File is Directory!");
 			throw new Exception("Queue File is Directory!");
@@ -26,8 +50,29 @@ public class FileQueue implements Queue<byte[]> {
 			throw new Exception("Queue File invalid Permissions!");
 		}
 		
+		@SuppressWarnings("resource")
+		RandomAccessFile queueFile = new RandomAccessFile(queue, "rwd");
 		
+		queueBuffer = queueFile.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, FileQueue.BUFFERLENGTH);
 		
+		if(existAlready){
+			try {
+				long fileSig = queueBuffer.getLong(0);
+				if(fileSig != SIGNATURE){
+					throw new Exception("File Is Not A AkazaMQ File!");
+				}
+			} catch (IndexOutOfBoundsException e) {
+				// TODO: handle exception
+				throw new Exception("File Is Not A AkazaMQ File!");
+			}			
+		}else{
+			queueBuffer.putLong(0, SIGNATURE);
+			queueBuffer.putLong(8, SIGNATURE);
+		}
+		queueBuffer.force();
+		byte[] temp = new byte[9];
+		queueBuffer.get(temp);
+		System.out.println(temp[8]);
 	}
 
 	@Override
