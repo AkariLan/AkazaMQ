@@ -11,7 +11,7 @@ import org.apache.log4j.Logger;
 
 public class FileQueue implements Queue<byte[]> {
 	
-	public static long SIGNATURE = 0x414B415A; //AKAZ 8BYTE
+	public static long SIGNATURE = 0x414B415A414D51L; //AKAZAMQ 8BYTE
 	
 	public static long BUFFERLENGTH = 0x10000; //64kb
 	
@@ -67,12 +67,13 @@ public class FileQueue implements Queue<byte[]> {
 			}			
 		}else{
 			queueBuffer.putLong(0, SIGNATURE);
-			queueBuffer.putLong(8, SIGNATURE);
+			queueBuffer.put((byte)1);
 		}
 		queueBuffer.force();
+		Thread.sleep(100);
 		byte[] temp = new byte[9];
 		queueBuffer.get(temp);
-		System.out.println(temp[8]);
+		System.out.println(temp[0]);
 	}
 
 	@Override
