@@ -9,7 +9,7 @@ public class FileQueueTest {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 		try {
-			Queue fileQueue = new FileQueue("./cacheData/");
+			Queue<byte[]> fileQueue = new FileQueue("./cacheData/");
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
