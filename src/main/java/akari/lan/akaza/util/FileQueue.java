@@ -1,6 +1,9 @@
 package akari.lan.akaza.util;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -11,40 +14,92 @@ import org.apache.log4j.Logger;
 
 public class FileQueue implements Queue<byte[]> {
 	
-	public static long SIGNATURE = 0x414B415A414D51L; //AKAZAMQ 8BYTE
-	
+	public static long SIGNATURE = 0x414B415A414D51L; //AKAZAMQ 8BYTE	
 	public static long BUFFERLENGTH = 0x10000; //64kb
+	public static String cacheDir = "";
 	
 	private Logger logger = Logger.getLogger(FileQueue.class);
-	private MappedByteBuffer queueBuffer;
+	private MappedByteBuffer writeBuffer;
+	private MappedByteBuffer readBuffer;
 	
 	
-	public FileQueue(String dataFilePath) throws Exception {
+	public FileQueue(String dataFileDir) throws Exception {
 		// TODO Auto-generated constructor stub
 		
-		File queue = new File(dataFilePath);
-		
+		File cacheFileDir = new File(dataFileDir);
 		boolean existAlready = false;
 		
+		//create dir
+		if(!cacheFileDir.exists()){
+			try {
+				if(cacheFileDir.mkdirs()){
+					logger.info("Create Queue Cache File Dir.");
+				}else{
+					logger.info("Can Not Create Queue Cache File Dir.");
+					throw new Exception("Can Not Create Queue Cache File Dir.");
+				}				
+			} catch (Exception e) {
+				// TODO: handle exception
+				logger.info("Can Not Create Queue Cache File Dir.");
+				throw new Exception("Can Not Create Queue Cache File Dir.",e);
+			}
+		}else{
+			existAlready = true;
+		}
+		cacheDir = dataFileDir;
+		
+		//load file		
+		if(existAlready){
+			//verify file
+			File[] files = cacheFileDir.listFiles();
+			if(files.length>0){
+				for(int i = 0;i<files.length;i++){
+					if(!isAkazaFile(files[i])){
+						logger.error("Wrong Dir! Contain Wrong File.");
+						throw new Exception("Wrong Dir! Contain Wrong File.");
+					}
+				}
+			}
+			//locate read write queue
+			
+		}else{
+			//create new queue file
+			writeBuffer = createNewCacheFile();
+			readBuffer = writeBuffer;
+		}	
+	}
+
+	private MappedByteBuffer createNewCacheFile() throws Exception{
+		
+		String dataFilePath = cacheDir+System.currentTimeMillis()+".aka";
+		
+		File queue = new File(dataFilePath);		
 		if(!queue.exists()){
-			if(queue.createNewFile()){
-				logger.info("Create Queue File:"+dataFilePath);
-			}else{
+			try {
+				if(queue.createNewFile()){
+					logger.info("Create Queue File:"+dataFilePath);
+				}else{
+					logger.info("Could Not Create Queue File:"+dataFilePath);
+					throw new Exception("Could Not Create Queue File:"+dataFilePath);
+				}
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				//e.printStackTrace();
 				logger.info("Could Not Create Queue File:"+dataFilePath);
 				throw new Exception("Could Not Create Queue File:"+dataFilePath);
 			}
 		}else{
-			existAlready = true;
+			throw new Exception("File Already Exist:"+dataFilePath);
 		}
 		
 		/*if(!queue.exists()){
 			logger.error("Queue File Doesn't Exits!");
 			throw new Exception("Queue File Doesn't Exits!");
-		}*/
+		}
 		if(queue.isDirectory()){
 			logger.error("Queue File is Directory!");
 			throw new Exception("Queue File is Directory!");
-		}
+		}*/
 		if(!queue.canRead()||!queue.canWrite()){
 			logger.error("Queue File invalid Permissions!");
 			throw new Exception("Queue File invalid Permissions!");
@@ -53,29 +108,51 @@ public class FileQueue implements Queue<byte[]> {
 		@SuppressWarnings("resource")
 		RandomAccessFile queueFile = new RandomAccessFile(queue, "rwd");
 		
-		queueBuffer = queueFile.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, FileQueue.BUFFERLENGTH);
+		MappedByteBuffer queueBuffer = queueFile.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, FileQueue.BUFFERLENGTH);
 		
-		if(existAlready){
-			try {
-				long fileSig = queueBuffer.getLong(0);
-				if(fileSig != SIGNATURE){
-					throw new Exception("File Is Not A AkazaMQ File!");
-				}
-			} catch (IndexOutOfBoundsException e) {
-				// TODO: handle exception
-				throw new Exception("File Is Not A AkazaMQ File!");
-			}			
-		}else{
-			queueBuffer.putLong(0, SIGNATURE);
-			queueBuffer.put((byte)1);
-		}
-		queueBuffer.force();
-		Thread.sleep(100);
-		byte[] temp = new byte[9];
-		queueBuffer.get(temp);
-		System.out.println(temp[0]);
+		
+		queueBuffer.putLong(SIGNATURE); //SIGNATURE		
+		queueBuffer.put((byte) 0); // write finished? 0:unfinished 1:finished
+		queueBuffer.put((byte) 0); // read finished? 0: 1:
+		queueBuffer.putLong(32);   // write offset, can write at 32nd byte (index of 0)
+		queueBuffer.putLong(32);   // read offset, same
+		
+		queueBuffer.force();//flush	
+		return queueBuffer;
 	}
-
+	
+	private boolean isAkazaFile(File file) throws IOException{
+		if(!file.exists()||file.isDirectory())
+			return false;
+		if(file.length()<32)
+			return false;
+		
+		byte[] fileHead = new byte[8];
+		
+		InputStream inputStream = new FileInputStream(file);
+		inputStream.read(fileHead);
+		
+		
+		long fileSig = byte2long(fileHead);
+		
+		System.out.println(fileSig);
+		
+		if(fileSig != SIGNATURE)
+			return false;
+		return true;		
+	}
+	
+	private long byte2long(byte[] bytes){
+		long result = 0;
+		long temp = 0;
+		for(int i = 0;i<8;i++){
+			temp = bytes[i] & 0xffL;
+			temp <<= ((7-i)*8);
+			result |= temp;
+		}
+		return result;
+	}
+	
 	@Override
 	public int size() {
 		// TODO Auto-generated method stub
