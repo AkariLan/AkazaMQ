@@ -27,6 +27,7 @@ jobs:
         distribution: 'temurin'
         server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
         settings-path: ${{ github.workspace }} # location for the settings.xml file
+        token: ${{ secrets.TOKEN_WITH_WORKFLOWS_PERMISSION }}
 
     - name: Build with Maven
       run: mvn -B package --file pom.xml
@@ -44,8 +45,8 @@ jobs:
       uses: cloudposse/github-action-auto-format@v0.12.0
       with:
         # Name of formatting task to execute. (Options include: readme, github, terraform, and context.)
-        format-tasks: |
+        format-task: |
           ["readme", "github", "terraform", "context"]
         # GitHub Token for use in `github_format.sh` and PR creation steps. This token must be granted `workflows` permissions.
         workflow-token: ${{ secrets.TOKEN_WITH_WORKFLOWS_PERMISSION.TOKEN_WITH_WORKFLOWS_PERMISSION }}
-        token: ${{ secrets.TOKEN_WITH_WORKFLOWS_PERMISSION }}
+        
