@@ -48,3 +48,4 @@ jobs:
           ["readme", "github", "terraform", "context"]
         # GitHub Token for use in `github_format.sh` and PR creation steps. This token must be granted `workflows` permissions.
         workflow-token: ${{ secrets.TOKEN_WITH_WORKFLOWS_PERMISSION.TOKEN_WITH_WORKFLOWS_PERMISSION }}
+        token: ${{ secrets.TOKEN_WITH_WORKFLOWS_PERMISSION }}
