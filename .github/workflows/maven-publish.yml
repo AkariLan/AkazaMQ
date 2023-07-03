@@ -19,7 +19,7 @@ jobs:
       packages: write
 
     steps:
-    - uses: AkariLan/TestAction@v1
+    - uses: AkariLan/TestAction@v1.1
       with:
         who-to-greet: "Lan"
     - uses: actions/checkout@v3
